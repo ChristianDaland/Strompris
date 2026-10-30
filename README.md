@@ -5,6 +5,7 @@ Dagens og morgendagens strømpriser i Norge (NO1–NO5), med været for valgt st
 
 - Priser: [hvakosterstrommen.no](https://www.hvakosterstrommen.no) (spotpris, valgfritt med mva; NO4 er uten mva)
 - Vær: [Meteorologisk institutt](https://api.met.no)
+- Været følger telefonens posisjon (kommunenavn fra Kartverket), med Birkeland som reserve. Man kan også velge en fast by.
 - Område, værsted og mva-valg lagres i `localStorage` på enheten.
 
 ## Utvikling

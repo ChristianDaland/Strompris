@@ -114,7 +114,6 @@ footer a { color: inherit; }
 <section class="kort innst" id="innst" hidden>
   <label for="sted">Sted for været</label>
   <select id="sted"></select>
-  <button id="posKnapp" style="margin-top:8px">📍 Bruk min posisjon</button>
   <div class="bryter"><input type="checkbox" id="mva"><label for="mva" style="margin:0;color:inherit">Vis priser med mva</label></div>
   <p class="liten svak" style="margin:10px 0 0">Valgene huskes på denne enheten. Prisene er spotpris uten nettleie og påslag fra strømselskapet.</p>
 </section>
@@ -168,7 +167,7 @@ const SONER = {
 const STEDER = [
   ['Oslo', 59.9139, 10.7522, 'NO1'], ['Fredrikstad', 59.2181, 10.9298, 'NO1'], ['Drammen', 59.7441, 10.2045, 'NO1'],
   ['Hamar', 60.7945, 11.0680, 'NO1'], ['Lillehammer', 61.1153, 10.4662, 'NO1'],
-  ['Kristiansand', 58.1467, 7.9956, 'NO2'], ['Arendal', 58.4615, 8.7726, 'NO2'], ['Grimstad', 58.3405, 8.5934, 'NO2'],
+  ['Birkeland', 58.3341, 8.2319, 'NO2'], ['Kristiansand', 58.1467, 7.9956, 'NO2'], ['Arendal', 58.4615, 8.7726, 'NO2'], ['Grimstad', 58.3405, 8.5934, 'NO2'],
   ['Mandal', 58.0294, 7.4608, 'NO2'], ['Stavanger', 58.9700, 5.7331, 'NO2'], ['Skien', 59.2096, 9.6090, 'NO2'],
   ['Trondheim', 63.4305, 10.3951, 'NO3'], ['Ålesund', 62.4722, 6.1495, 'NO3'], ['Molde', 62.7375, 7.1591, 'NO3'],
   ['Tromsø', 69.6492, 18.9553, 'NO4'], ['Bodø', 67.2804, 14.4049, 'NO4'], ['Narvik', 68.4385, 17.4272, 'NO4'],
@@ -183,7 +182,9 @@ function les(nokkel, standard) {
 function skriv(nokkel, verdi) {
   try { localStorage.setItem(nokkel, JSON.stringify(verdi)); } catch {}
 }
+// sted: { pos: true, lat, lon, kommune } følger telefonens posisjon, { navn } er en fast by
 const valg = Object.assign({ sone: 'NO2', sted: null, mva: true }, les('stromValg', {}));
+if (!valg.sted || (!valg.sted.pos && !valg.sted.navn)) valg.sted = { pos: true };
 function lagreValg() { skriv('stromValg', valg); }
 
 // --- Hjelpere ---
@@ -373,13 +374,47 @@ function symbol(kode) {
 }
 
 function valgtSted() {
-  if (valg.sted && valg.sted.pos) return valg.sted;
-  const navn = valg.sted?.navn;
-  const s = STEDER.find(s => s[0] === navn) || STEDER.find(s => s[3] === valg.sone);
+  const st = valg.sted;
+  if (st.pos && st.lat != null) return { navn: '📍 ' + (st.kommune || 'Min posisjon'), lat: st.lat, lon: st.lon };
+  // Uten posisjon ennå: første by i valgt område
+  const s = (!st.pos && STEDER.find(s => s[0] === st.navn)) || STEDER.find(s => s[3] === valg.sone);
   return { navn: s[0], lat: s[1], lon: s[2] };
 }
 
+function hentPosisjon() {
+  return new Promise(ok => {
+    if (!navigator.geolocation) return ok(null);
+    navigator.geolocation.getCurrentPosition(p => ok(p.coords), () => ok(null), { timeout: 10000, maximumAge: 10 * 60e3 });
+  });
+}
+function avstandKm(a, b) {
+  const dy = (a.lat - b.lat) * 111, dx = (a.lon - b.lon) * 111 * Math.cos(a.lat * Math.PI / 180);
+  return Math.hypot(dx, dy);
+}
+async function oppdaterPosisjon() {
+  const c = await hentPosisjon();
+  if (!c || !valg.sted.pos) return;
+  const ny = { lat: c.latitude, lon: c.longitude };
+  const gammel = valg.sted;
+  if (gammel.lat == null || avstandKm(ny, gammel) > 1 || !gammel.kommune) {
+    let kommune = null;
+    try {
+      const svar = await fetch(`https://ws.geonorge.no/kommuneinfo/v1/punkt?nord=${ny.lat.toFixed(5)}&ost=${ny.lon.toFixed(5)}&koordsys=4258`);
+      if (svar.ok) kommune = (await svar.json()).kommunenavn;
+    } catch {}
+    valg.sted = { pos: true, ...ny, kommune: kommune || gammel.kommune };
+    lagreValg();
+    return true;
+  }
+}
+
 async function oppdaterVaer() {
+  // Vis sist kjente sted med en gang, og hent været på nytt hvis telefonen har flyttet seg
+  hentVaer();
+  if (valg.sted.pos && await oppdaterPosisjon()) { tegnSteder(); hentVaer(); }
+}
+
+async function hentVaer() {
   const sted = valgtSted();
   $('vaerSted').textContent = 'Været – ' + sted.navn;
   try {
@@ -424,8 +459,8 @@ $('soner').addEventListener('click', e => {
   const b = e.target.closest('[data-sone]');
   if (!b || b.dataset.sone === valg.sone) return;
   valg.sone = b.dataset.sone;
-  // Bytt værsted til soneens by, med mindre man har valgt egen posisjon
-  if (!valg.sted?.pos) valg.sted = null;
+  // Bytt værsted til områdets by, med mindre været følger posisjonen
+  if (!valg.sted.pos) valg.sted = { navn: STEDER.find(s => s[3] === valg.sone)[0] };
   lagreValg(); tegnSoner(); tegnSteder();
   valgtIndeks = null;
   oppdaterPriser(); oppdaterVaer();
@@ -434,29 +469,17 @@ $('soner').addEventListener('click', e => {
 function tegnSteder() {
   const sel = $('sted');
   const naa = valgtSted();
-  let html = valg.sted?.pos ? `<option value="__pos" selected>📍 Min posisjon</option>` : '';
+  const pos = valg.sted.pos;
+  let html = `<option value="__pos" ${pos ? 'selected' : ''}>📍 Min posisjon${pos && valg.sted.kommune ? ' (' + valg.sted.kommune + ')' : ''}</option>`;
   for (const [kode, s] of Object.entries(SONER)) {
     html += `<optgroup label="${s.navn} (${kode})">` + STEDER.filter(x => x[3] === kode).map(x =>
-      `<option ${!valg.sted?.pos && x[0] === naa.navn ? 'selected' : ''}>${x[0]}</option>`).join('') + '</optgroup>';
+      `<option ${!pos && x[0] === naa.navn ? 'selected' : ''}>${x[0]}</option>`).join('') + '</optgroup>';
   }
   sel.innerHTML = html;
 }
 $('sted').onchange = e => {
-  if (e.target.value === '__pos') return;
-  valg.sted = { navn: e.target.value };
+  valg.sted = e.target.value === '__pos' ? { pos: true } : { navn: e.target.value };
   lagreValg(); tegnSteder(); oppdaterVaer();
-};
-$('posKnapp').onclick = () => {
-  if (!navigator.geolocation) return alert('Posisjon er ikke tilgjengelig på denne enheten.');
-  $('posKnapp').textContent = 'Finner posisjon …';
-  navigator.geolocation.getCurrentPosition(p => {
-    valg.sted = { navn: 'Min posisjon', pos: true, lat: p.coords.latitude, lon: p.coords.longitude };
-    lagreValg(); tegnSteder(); oppdaterVaer();
-    $('posKnapp').textContent = '📍 Bruk min posisjon';
-  }, () => {
-    $('posKnapp').textContent = '📍 Bruk min posisjon';
-    alert('Fikk ikke tilgang til posisjonen.');
-  }, { timeout: 15000, maximumAge: 6e5 });
 };
 $('mva').checked = valg.mva;
 $('mva').onchange = e => { valg.mva = e.target.checked; lagreValg(); visNaa(); visGraf(); };
