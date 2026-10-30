@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Strømpris</title>
+<meta name="description" content="Dagens strømpriser i Norge og været der du bor">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="ikoner/ikon-192.png">
+<link rel="apple-touch-icon" href="ikoner/ikon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Strømpris">
+<meta name="theme-color" content="#0f1720">
+<style>
+:root {
+  --bg: #f4f6f8;
+  --kort: #ffffff;
+  --tekst: #14202b;
+  --svak: #5f6d7a;
+  --linje: #e2e7ec;
+  --aksent: #1f6feb;
+  --lav: #2e9e5b;
+  --mid: #d9a21b;
+  --hoy: #d8553a;
+  --naa: #14202b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1720;
+    --kort: #18222d;
+    --tekst: #e8eef3;
+    --svak: #93a1ae;
+    --linje: #293644;
+    --aksent: #5b9bff;
+    --lav: #45b874;
+    --mid: #e3b440;
+    --hoy: #ec6d52;
+    --naa: #e8eef3;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--tekst); }
+body {
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 24px);
+  max-width: 560px; margin: 0 auto;
+  -webkit-tap-highlight-color: transparent;
+}
+header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+h1 { font-size: 20px; margin: 0; }
+.kort { background: var(--kort); border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.svak { color: var(--svak); }
+.liten { font-size: 13px; }
+
+.soner { display: flex; gap: 6px; margin-bottom: 12px; }
+.sone {
+  flex: 1; min-width: 0; border: 1px solid var(--linje); background: var(--kort); color: var(--tekst);
+  border-radius: 12px; padding: 6px 2px; font: inherit; font-size: 12px; line-height: 1.2; cursor: pointer;
+}
+.sone b { display: block; font-size: 15px; font-weight: 600; }
+.sone[aria-pressed="true"] { background: var(--aksent); border-color: var(--aksent); color: #fff; }
+
+.naa-pris { display: flex; align-items: baseline; gap: 8px; }
+.naa-pris .tall { font-size: 52px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+.merke { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 13px; font-weight: 600; color: #fff; }
+.merke.lav { background: var(--lav); } .merke.mid { background: var(--mid); } .merke.hoy { background: var(--hoy); }
+.rad { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; }
+.rad > div { flex: 1; }
+.rad .verdi { font-weight: 600; font-size: 17px; }
+
+.faner { display: flex; gap: 6px; margin-bottom: 10px; }
+.fane { border: 0; background: none; color: var(--svak); font: inherit; font-weight: 600; padding: 4px 2px; border-bottom: 2px solid transparent; cursor: pointer; }
+.fane[aria-selected="true"] { color: var(--tekst); border-color: var(--aksent); }
+.fane:disabled { opacity: .45; cursor: default; }
+#graf { width: 100%; height: auto; display: block; touch-action: pan-y; }
+#graf text { fill: var(--svak); font-size: 10px; }
+#graf .rutenett { stroke: var(--linje); }
+#graf .naa-strek { stroke: var(--naa); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.valgt-info { min-height: 20px; margin-top: 6px; font-size: 14px; }
+
+.vaer-topp { display: flex; align-items: center; gap: 12px; }
+.vaer-ikon { font-size: 44px; line-height: 1; }
+.vaer-temp { font-size: 36px; font-weight: 700; }
+.timer { display: flex; gap: 4px; overflow-x: auto; margin: 14px -16px 0; padding: 0 16px; scrollbar-width: none; }
+.timer::-webkit-scrollbar { display: none; }
+.time { flex: 0 0 52px; text-align: center; font-size: 13px; }
+.time .i { font-size: 22px; margin: 2px 0; }
+.time .t { font-weight: 600; font-size: 14px; }
+.time .r { color: var(--aksent); font-size: 11px; min-height: 14px; }
+
+.innst label { display: block; font-size: 13px; color: var(--svak); margin: 10px 0 4px; }
+.innst select, .innst button {
+  width: 100%; font: inherit; padding: 9px 10px; border-radius: 10px;
+  border: 1px solid var(--linje); background: var(--bg); color: var(--tekst);
+}
+.bryter { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 15px; }
+.bryter input { width: 20px; height: 20px; }
+.ikon-knapp { border: 0; background: none; font-size: 22px; padding: 4px; cursor: pointer; color: var(--tekst); }
+.feil { color: var(--hoy); }
+footer { font-size: 12px; color: var(--svak); text-align: center; margin-top: 8px; }
+footer a { color: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Strømpris</h1>
+  <button class="ikon-knapp" id="innstKnapp" aria-label="Innstillinger">⚙︎</button>
+</header>
+
+<div class="soner" id="soner" role="group" aria-label="Prisområde"></div>
+
+<section class="kort innst" id="innst" hidden>
+  <label for="sted">Sted for været</label>
+  <select id="sted"></select>
+  <button id="posKnapp" style="margin-top:8px">📍 Bruk min posisjon</button>
+  <div class="bryter"><input type="checkbox" id="mva"><label for="mva" style="margin:0;color:inherit">Vis priser med mva</label></div>
+  <p class="liten svak" style="margin:10px 0 0">Valgene huskes på denne enheten. Prisene er spotpris uten nettleie og påslag fra strømselskapet.</p>
+</section>
+
+<section class="kort" id="prisKort">
+  <div class="svak liten" id="naaTittel">Pris nå</div>
+  <div class="naa-pris"><span class="tall" id="naaTall">–</span><span class="svak">øre/kWh</span></div>
+  <div style="margin-top:8px"><span class="merke" id="naaMerke" hidden></span> <span class="svak liten" id="nesteTime"></span></div>
+  <div class="rad">
+    <div><div class="svak liten">Lavest</div><div class="verdi" id="lavest">–</div><div class="svak liten" id="lavestKl"></div></div>
+    <div><div class="svak liten">Snitt</div><div class="verdi" id="snitt">–</div><div class="svak liten">i dag</div></div>
+    <div><div class="svak liten">Høyest</div><div class="verdi" id="hoyest">–</div><div class="svak liten" id="hoyestKl"></div></div>
+  </div>
+</section>
+
+<section class="kort">
+  <div class="faner" role="tablist">
+    <button class="fane" role="tab" id="faneIdag" aria-selected="true">I dag</button>
+    <button class="fane" role="tab" id="faneImorgen" aria-selected="false">I morgen</button>
+  </div>
+  <svg id="graf" viewBox="0 0 340 170" role="img" aria-label="Strømpris per time"></svg>
+  <div class="valgt-info" id="valgtInfo"></div>
+  <div class="liten svak" id="billigst"></div>
+</section>
+
+<section class="kort" id="vaerKort">
+  <div class="svak liten" id="vaerSted">Været</div>
+  <div class="vaer-topp">
+    <div class="vaer-ikon" id="vaerIkon">–</div>
+    <div>
+      <div class="vaer-temp" id="vaerTemp">–</div>
+      <div class="svak liten" id="vaerDetalj"></div>
+    </div>
+  </div>
+  <div class="timer" id="vaerTimer"></div>
+</section>
+
+<footer>
+  <span id="oppdatert"></span><br>
+  Priser: <a href="https://www.hvakosterstrommen.no">hvakosterstrommen.no</a> · Vær: <a href="https://www.met.no">Meteorologisk institutt</a>
+</footer>
+
+<script>
+const SONER = {
+  NO1: { navn: 'Øst' },
+  NO2: { navn: 'Sør' },
+  NO3: { navn: 'Midt' },
+  NO4: { navn: 'Nord', utenMva: true },
+  NO5: { navn: 'Vest' },
+};
+const STEDER = [
+  ['Oslo', 59.9139, 10.7522, 'NO1'], ['Fredrikstad', 59.2181, 10.9298, 'NO1'], ['Drammen', 59.7441, 10.2045, 'NO1'],
+  ['Hamar', 60.7945, 11.0680, 'NO1'], ['Lillehammer', 61.1153, 10.4662, 'NO1'],
+  ['Kristiansand', 58.1467, 7.9956, 'NO2'], ['Arendal', 58.4615, 8.7726, 'NO2'], ['Grimstad', 58.3405, 8.5934, 'NO2'],
+  ['Mandal', 58.0294, 7.4608, 'NO2'], ['Stavanger', 58.9700, 5.7331, 'NO2'], ['Skien', 59.2096, 9.6090, 'NO2'],
+  ['Trondheim', 63.4305, 10.3951, 'NO3'], ['Ålesund', 62.4722, 6.1495, 'NO3'], ['Molde', 62.7375, 7.1591, 'NO3'],
+  ['Tromsø', 69.6492, 18.9553, 'NO4'], ['Bodø', 67.2804, 14.4049, 'NO4'], ['Narvik', 68.4385, 17.4272, 'NO4'],
+  ['Alta', 69.9689, 23.2716, 'NO4'],
+  ['Bergen', 60.3913, 5.3221, 'NO5'], ['Voss', 60.6280, 6.4180, 'NO5'], ['Førde', 61.4522, 5.8572, 'NO5'],
+];
+
+// --- Lagring (huskes fra gang til gang) ---
+function les(nokkel, standard) {
+  try { const v = localStorage.getItem(nokkel); return v === null ? standard : JSON.parse(v); } catch { return standard; }
+}
+function skriv(nokkel, verdi) {
+  try { localStorage.setItem(nokkel, JSON.stringify(verdi)); } catch {}
+}
+const valg = Object.assign({ sone: 'NO2', sted: null, mva: true }, les('stromValg', {}));
+function lagreValg() { skriv('stromValg', valg); }
+
+// --- Hjelpere ---
+const OSLO = 'Europe/Oslo';
+function datoOslo(d) { return new Intl.DateTimeFormat('en-CA', { timeZone: OSLO }).format(d); }
+function kl(d) { return new Intl.DateTimeFormat('nb-NO', { timeZone: OSLO, hour: '2-digit', minute: '2-digit' }).format(d); }
+function time(d) { return new Intl.DateTimeFormat('nb-NO', { timeZone: OSLO, hour: '2-digit' }).format(d); }
+function ore(kr) {
+  const mva = valg.mva && !SONER[valg.sone].utenMva ? 1.25 : 1;
+  return kr * 100 * mva;
+}
+function visOre(kr) { return Math.round(ore(kr)).toLocaleString('nb-NO'); }
+const $ = id => document.getElementById(id);
+
+// --- Strømpriser ---
+async function hentPriser(dato, sone) {
+  const nokkel = `pris:${sone}:${dato}`;
+  const lagret = les(nokkel, null);
+  if (lagret) return lagret;
+  const [aar, mnd, dag] = dato.split('-');
+  const svar = await fetch(`https://www.hvakosterstrommen.no/api/v1/prices/${aar}/${mnd}-${dag}_${sone}.json`);
+  if (svar.status === 404) return null; // morgendagens priser er ikke klare ennå
+  if (!svar.ok) throw new Error('Fikk ikke hentet priser');
+  const data = (await svar.json()).map(p => ({ kr: p.NOK_per_kWh, fra: p.time_start, til: p.time_end }));
+  skriv(nokkel, data);
+  ryddGamlePriser();
+  return data;
+}
+function ryddGamlePriser() {
+  try {
+    const grense = datoOslo(new Date(Date.now() - 2 * 864e5));
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith('pris:') && k.slice(-10) < grense) localStorage.removeItem(k);
+    }
+  } catch {}
+}
+
+let priser = { idag: null, imorgen: null };
+let visDag = 'idag';
+let valgtIndeks = null;
+
+// Billig/dyrt i forhold til dagens snitt: mer enn 10 % under eller over, eller 15 øre (uten mva)
+function nivaa(kr, liste) {
+  const snitt = liste.reduce((s, p) => s + p.kr, 0) / liste.length;
+  const grense = Math.max(Math.abs(snitt) * 0.1, 0.15);
+  return kr < snitt - grense ? 'lav' : kr > snitt + grense ? 'hoy' : 'mid';
+}
+const NIVAA_TEKST = { lav: 'Billig nå', mid: 'Vanlig pris i dag', hoy: 'Dyrt nå' };
+
+function visNaa() {
+  const liste = priser.idag;
+  if (!liste) return;
+  const naa = Date.now();
+  const i = liste.findIndex(p => new Date(p.fra) <= naa && naa < new Date(p.til));
+  const p = liste[i];
+  $('naaTall').textContent = p ? visOre(p.kr) : '–';
+  $('naaTittel').textContent = p ? `Pris nå, kl. ${kl(new Date(p.fra))}–${kl(new Date(p.til))}` : 'Pris nå';
+  const merke = $('naaMerke');
+  if (p) {
+    const n = nivaa(p.kr, liste);
+    merke.className = 'merke ' + n; merke.textContent = NIVAA_TEKST[n]; merke.hidden = false;
+  } else merke.hidden = true;
+  const neste = liste[i + 1] || (priser.imorgen && priser.imorgen[0]);
+  $('nesteTime').textContent = neste ? `Neste: ${visOre(neste.kr)} øre kl. ${kl(new Date(neste.fra))}` : '';
+
+  let lav = liste[0], hoy = liste[0], sum = 0;
+  for (const q of liste) { if (q.kr < lav.kr) lav = q; if (q.kr > hoy.kr) hoy = q; sum += q.kr; }
+  $('lavest').textContent = visOre(lav.kr); $('lavestKl').textContent = 'kl. ' + kl(new Date(lav.fra));
+  $('hoyest').textContent = visOre(hoy.kr); $('hoyestKl').textContent = 'kl. ' + kl(new Date(hoy.fra));
+  $('snitt').textContent = visOre(sum / liste.length);
+}
+
+function visGraf() {
+  const svg = $('graf');
+  const liste = priser[visDag];
+  $('faneImorgen').disabled = !priser.imorgen;
+  $('faneIdag').setAttribute('aria-selected', visDag === 'idag');
+  $('faneImorgen').setAttribute('aria-selected', visDag === 'imorgen');
+  if (!liste) {
+    svg.innerHTML = `<text x="170" y="85" text-anchor="middle">${visDag === 'imorgen' ? 'Morgendagens priser kommer ca. kl. 13' : 'Ingen priser'}</text>`;
+    $('billigst').textContent = '';
+    return;
+  }
+  const B = 340, H = 170, venstre = 28, bunn = 18, topp = 6;
+  const verdier = liste.map(p => ore(p.kr));
+  const maks = Math.max(...verdier, 1);
+  const min = Math.min(0, ...verdier);
+  const steg = finnSteg(maks - min);
+  const yMaks = Math.ceil(maks / steg) * steg, yMin = Math.floor(min / steg) * steg;
+  const y = v => topp + (H - bunn - topp) * (yMaks - v) / (yMaks - yMin);
+  const bredde = (B - venstre) / liste.length;
+  let s = '';
+  for (let v = yMin; v <= yMaks + 1e-9; v += steg) {
+    s += `<line class="rutenett" x1="${venstre}" x2="${B}" y1="${y(v)}" y2="${y(v)}"/>`;
+    s += `<text x="${venstre - 4}" y="${y(v) + 3}" text-anchor="end">${Math.round(v)}</text>`;
+  }
+  const naa = Date.now();
+  const perTime = Math.round(liste.length / 24) || 1;
+  liste.forEach((p, i) => {
+    const x = venstre + i * bredde;
+    const v = verdier[i];
+    const erNaa = new Date(p.fra) <= naa && naa < new Date(p.til);
+    const farge = `var(--${nivaa(p.kr, liste)})`;
+    const opasitet = valgtIndeks === null ? (erNaa ? 1 : 0.85) : (valgtIndeks === i ? 1 : 0.45);
+    const y0 = y(Math.max(v, 0)), y1 = y(Math.min(v, 0));
+    s += `<rect x="${x + bredde * 0.12}" y="${y0}" width="${bredde * 0.76}" height="${Math.max(y1 - y0, 1)}" rx="1.5" fill="${farge}" opacity="${opasitet}"/>`;
+    if (erNaa) s += `<line class="naa-strek" x1="${x + bredde / 2}" x2="${x + bredde / 2}" y1="${topp}" y2="${H - bunn}"/>`;
+    if (i % (6 * perTime) === 0) s += `<text x="${x + bredde / 2}" y="${H - 4}" text-anchor="middle">${time(new Date(p.fra))}</text>`;
+  });
+  svg.innerHTML = s;
+
+  if (valgtIndeks !== null && liste[valgtIndeks]) {
+    const p = liste[valgtIndeks];
+    $('valgtInfo').textContent = `Kl. ${kl(new Date(p.fra))}–${kl(new Date(p.til))}: ${visOre(p.kr)} øre/kWh`;
+  } else $('valgtInfo').textContent = 'Trykk på en stolpe for å se prisen.';
+
+  // Billigste sammenhengende 3 timer (resten av dagen hvis det er i dag)
+  const vindu = 3 * perTime;
+  let best = null;
+  for (let i = 0; i + vindu <= liste.length; i++) {
+    if (visDag === 'idag' && new Date(liste[i + vindu - 1].til) <= naa) continue;
+    if (visDag === 'idag' && new Date(liste[i].fra) < naa - 36e5 / perTime) continue;
+    let sum = 0;
+    for (let j = i; j < i + vindu; j++) sum += liste[j].kr;
+    if (!best || sum < best.sum) best = { i, sum };
+  }
+  $('billigst').textContent = best
+    ? `Billigste 3 timer${visDag === 'idag' ? ' igjen i dag' : ''}: kl. ${kl(new Date(liste[best.i].fra))}–${kl(new Date(liste[best.i + vindu - 1].til))} (snitt ${visOre(best.sum / vindu)} øre)`
+    : '';
+}
+function finnSteg(spenn) {
+  const grov = spenn / 4;
+  const pot = 10 ** Math.floor(Math.log10(grov || 1));
+  return [1, 2, 5, 10].map(f => f * pot).find(f => f >= grov);
+}
+
+$('graf').addEventListener('click', e => {
+  const liste = priser[visDag];
+  if (!liste) return;
+  const r = $('graf').getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * 340;
+  const i = Math.floor((x - 28) / ((340 - 28) / liste.length));
+  valgtIndeks = i >= 0 && i < liste.length && i !== valgtIndeks ? i : null;
+  visGraf();
+});
+$('faneIdag').onclick = () => { visDag = 'idag'; valgtIndeks = null; visGraf(); };
+$('faneImorgen').onclick = () => { if (priser.imorgen) { visDag = 'imorgen'; valgtIndeks = null; visGraf(); } };
+
+async function oppdaterPriser() {
+  const sone = valg.sone;
+  const idag = datoOslo(new Date());
+  const imorgen = datoOslo(new Date(Date.now() + 864e5));
+  try {
+    const [a, b] = await Promise.all([hentPriser(idag, sone), hentPriser(imorgen, sone).catch(() => null)]);
+    if (sone !== valg.sone) return;
+    priser = { idag: a, imorgen: b };
+    if (!b && visDag === 'imorgen') visDag = 'idag';
+    $('prisKort').querySelector('.feil')?.remove();
+  } catch (e) {
+    if (!$('prisKort').querySelector('.feil')) {
+      $('prisKort').insertAdjacentHTML('beforeend', '<p class="feil liten">Fikk ikke hentet priser. Sjekk nettet.</p>');
+    }
+  }
+  visNaa(); visGraf();
+  $('oppdatert').textContent = 'Oppdatert ' + kl(new Date());
+}
+
+// --- Vær ---
+const SYMBOL = {
+  clearsky: ['☀️', 'Klarvær'], fair: ['🌤️', 'Lettskyet'], partlycloudy: ['⛅', 'Delvis skyet'], cloudy: ['☁️', 'Skyet'],
+  fog: ['🌫️', 'Tåke'], lightrain: ['🌦️', 'Lett regn'], rain: ['🌧️', 'Regn'], heavyrain: ['🌧️', 'Kraftig regn'],
+  lightrainshowers: ['🌦️', 'Lette regnbyger'], rainshowers: ['🌦️', 'Regnbyger'], heavyrainshowers: ['🌧️', 'Kraftige regnbyger'],
+  lightsleet: ['🌨️', 'Lett sludd'], sleet: ['🌨️', 'Sludd'], heavysleet: ['🌨️', 'Kraftig sludd'],
+  lightsleetshowers: ['🌨️', 'Sluddbyger'], sleetshowers: ['🌨️', 'Sluddbyger'], heavysleetshowers: ['🌨️', 'Sluddbyger'],
+  lightsnow: ['🌨️', 'Lett snø'], snow: ['❄️', 'Snø'], heavysnow: ['❄️', 'Kraftig snø'],
+  lightsnowshowers: ['🌨️', 'Snøbyger'], snowshowers: ['🌨️', 'Snøbyger'], heavysnowshowers: ['❄️', 'Kraftige snøbyger'],
+};
+function symbol(kode) {
+  if (!kode) return ['–', ''];
+  const [navn, tid] = kode.split('_');
+  const torden = navn.includes('thunder');
+  const s = SYMBOL[navn.replace('andthunder', '')] || ['☁️', ''];
+  let ikon = torden ? '⛈️' : s[0];
+  if (tid === 'night' && (navn === 'clearsky')) ikon = '🌙';
+  if (tid === 'night' && (navn === 'fair' || navn === 'partlycloudy')) ikon = '☁️';
+  return [ikon, s[1] + (torden ? ' og torden' : '')];
+}
+
+function valgtSted() {
+  if (valg.sted && valg.sted.pos) return valg.sted;
+  const navn = valg.sted?.navn;
+  const s = STEDER.find(s => s[0] === navn) || STEDER.find(s => s[3] === valg.sone);
+  return { navn: s[0], lat: s[1], lon: s[2] };
+}
+
+async function oppdaterVaer() {
+  const sted = valgtSted();
+  $('vaerSted').textContent = 'Været – ' + sted.navn;
+  try {
+    const lat = sted.lat.toFixed(4), lon = sted.lon.toFixed(4);
+    const svar = await fetch(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`);
+    if (!svar.ok) throw new Error();
+    const data = await svar.json();
+    skriv('vaer:' + lat + ',' + lon, data);
+    visVaer(data);
+  } catch {
+    const lagret = les('vaer:' + sted.lat.toFixed(4) + ',' + sted.lon.toFixed(4), null);
+    if (lagret) visVaer(lagret);
+    else $('vaerDetalj').innerHTML = '<span class="feil">Fikk ikke hentet været.</span>';
+  }
+}
+
+function visVaer(data) {
+  const naa = Date.now();
+  const serie = data.properties.timeseries.filter(t => new Date(t.time) > naa - 36e5);
+  const f = serie[0];
+  if (!f) return;
+  const d = f.data.instant.details;
+  const [ikon, tekst] = symbol(f.data.next_1_hours?.summary.symbol_code);
+  $('vaerIkon').textContent = ikon;
+  $('vaerTemp').textContent = Math.round(d.air_temperature) + '°';
+  const regn = f.data.next_1_hours?.details.precipitation_amount;
+  $('vaerDetalj').textContent = `${tekst} · vind ${Math.round(d.wind_speed)} m/s` + (regn ? ` · ${regn.toLocaleString('nb-NO')} mm` : '');
+  $('vaerTimer').innerHTML = serie.slice(1, 25).filter(t => t.data.next_1_hours).map(t => {
+    const [i] = symbol(t.data.next_1_hours.summary.symbol_code);
+    const r = t.data.next_1_hours.details.precipitation_amount;
+    return `<div class="time"><div class="svak">${time(new Date(t.time))}</div><div class="i">${i}</div>` +
+      `<div class="t">${Math.round(t.data.instant.details.air_temperature)}°</div><div class="r">${r ? r.toLocaleString('nb-NO') : ''}</div></div>`;
+  }).join('');
+}
+
+// --- Innstillinger ---
+function tegnSoner() {
+  $('soner').innerHTML = Object.entries(SONER).map(([kode, s]) =>
+    `<button class="sone" data-sone="${kode}" aria-pressed="${kode === valg.sone}"><b>${s.navn}</b> ${kode}</button>`).join('');
+}
+$('soner').addEventListener('click', e => {
+  const b = e.target.closest('[data-sone]');
+  if (!b || b.dataset.sone === valg.sone) return;
+  valg.sone = b.dataset.sone;
+  // Bytt værsted til soneens by, med mindre man har valgt egen posisjon
+  if (!valg.sted?.pos) valg.sted = null;
+  lagreValg(); tegnSoner(); tegnSteder();
+  valgtIndeks = null;
+  oppdaterPriser(); oppdaterVaer();
+});
+
+function tegnSteder() {
+  const sel = $('sted');
+  const naa = valgtSted();
+  let html = valg.sted?.pos ? `<option value="__pos" selected>📍 Min posisjon</option>` : '';
+  for (const [kode, s] of Object.entries(SONER)) {
+    html += `<optgroup label="${s.navn} (${kode})">` + STEDER.filter(x => x[3] === kode).map(x =>
+      `<option ${!valg.sted?.pos && x[0] === naa.navn ? 'selected' : ''}>${x[0]}</option>`).join('') + '</optgroup>';
+  }
+  sel.innerHTML = html;
+}
+$('sted').onchange = e => {
+  if (e.target.value === '__pos') return;
+  valg.sted = { navn: e.target.value };
+  lagreValg(); tegnSteder(); oppdaterVaer();
+};
+$('posKnapp').onclick = () => {
+  if (!navigator.geolocation) return alert('Posisjon er ikke tilgjengelig på denne enheten.');
+  $('posKnapp').textContent = 'Finner posisjon …';
+  navigator.geolocation.getCurrentPosition(p => {
+    valg.sted = { navn: 'Min posisjon', pos: true, lat: p.coords.latitude, lon: p.coords.longitude };
+    lagreValg(); tegnSteder(); oppdaterVaer();
+    $('posKnapp').textContent = '📍 Bruk min posisjon';
+  }, () => {
+    $('posKnapp').textContent = '📍 Bruk min posisjon';
+    alert('Fikk ikke tilgang til posisjonen.');
+  }, { timeout: 15000, maximumAge: 6e5 });
+};
+$('mva').checked = valg.mva;
+$('mva').onchange = e => { valg.mva = e.target.checked; lagreValg(); visNaa(); visGraf(); };
+$('innstKnapp').onclick = () => { $('innst').hidden = !$('innst').hidden; };
+
+// --- Start og jevnlig oppdatering ---
+tegnSoner(); tegnSteder();
+oppdaterPriser(); oppdaterVaer();
+let sistVaer = Date.now();
+function oppfrisk() {
+  oppdaterPriser();
+  if (Date.now() - sistVaer > 15 * 60e3) { sistVaer = Date.now(); oppdaterVaer(); }
+}
+setInterval(oppfrisk, 5 * 60e3);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) oppfrisk(); });
+</script>
+</body>
+</html>
